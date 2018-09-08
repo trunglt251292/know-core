@@ -1,15 +1,11 @@
 {
   "minimumVersion": ">=1.1.1",
-  "minimumNetworkReach": 13,
+  "minimumNetworkReach": 5,
   "globalTimeout": 5000,
-  "coldStart": 13,
+  "coldStart": 5,
   "whiteList": [],
   "blackList": [],
   "list": [
-    {
-      "ip": "35.187.231.107",
-      "port": 4002
-    },
     {
       "ip": "35.235.83.83",
       "port": 4002
@@ -29,37 +25,6 @@
     {
       "ip": "35.194.240.177",
       "port": 4002
-    },
-    {
-      "ip": "35.204.69.112 ",
-      "port": 4002
-    },
-    {
-      "ip": "35.203.103.91",
-      "port": 4002
-    },
-    {
-      "ip": "35.237.115.187",
-      "port": 4002
-    },
-    {
-      "ip": "35.198.15.248",
-      "port": 4002
-    },
-    {
-      "ip": "35.200.48.169",
-      "port": 4002
-    },
-    {
-      "ip": "35.228.192.137",
-      "port": 4002
-    },
-    {
-      "ip": "35.184.101.184",
-      "port": 4002
     }
-  ],
-  "sources": [
-    "https://raw.githubusercontent.com/knownetwork/peers/master/devnet.json"
   ]
 }
