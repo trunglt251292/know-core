@@ -1,36 +1,37 @@
 {
   "name": "devnet",
-  "messagePrefix": "DARK message:\n",
+  "messagePrefix": "KNOW message:\n",
   "bip32": {
     "public": 46090600,
     "private": 46089520
   },
-  "pubKeyHash": 30,
-  "nethash": "2a44f340d76ffc3df204c5f38cd355b7496c9065a1ade2ef92071436bd72e867",
+  "pubKeyHash": 45,
+  "nethash": "360f42a0fedd0865b46fda3f853f2273431c041bbc2eaf4fe8be8c2ab174bf02",
   "wif": 170,
   "client": {
-    "token": "DARK",
-    "symbol": "DѦ",
-    "explorer": "https://dexplorer.ark.io"
+    "token": "KNOW",
+    "symbol": "KN",
+    "explorer": "https://dev.explorer.knownetwork.io"
   },
   "constants": [{
     "height": 1,
     "reward": 0,
-    "activeDelegates": 51,
-    "blocktime": 8,
+    "activeDelegates": 37,
+    "blocktime": 5,
     "block": {
       "version": 0,
       "maxTransactions": 50,
       "maxPayload": 2097152
     },
-    "epoch": "2017-03-21T13:00:00.000Z",
+    "epoch": "2018-03-21T13:00:00.000Z",
     "fees": {
       "dynamic" : false,
       "transfer": 10000000,
-      "secondSignature": 500000000,
-      "delegateRegistration": 2500000000,
-      "vote": 100000000,
-      "multiSignature": 500000000,
+      "secondSignature": 1000000000,
+      "delegateRegistration": 10000000000,
+      "vote": 1000000000,
+      "multiSignature": 1000000000,
+      "attachInfo": 100000000,
       "ipfs": 0,
       "timelockTransfer": 0,
       "multiPayment": 0,
@@ -49,7 +50,13 @@
     }
   }, {
     "height": 10800,
-    "reward": 200000000
+    "reward": 2500000000
+  }, {
+    "height": 21600,
+    "block": {
+      "maxTransactions": 150,
+      "maxPayload": 6300000
+    }
   }],
   "exceptions": {
   }
