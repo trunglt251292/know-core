@@ -1,15 +1,11 @@
 {
   "minimumVersion": ">=1.1.1",
-  "minimumNetworkReach": 5,
+  "minimumNetworkReach": 4,
   "globalTimeout": 5000,
   "coldStart": 5,
   "whiteList": [],
   "blackList": [],
   "list": [
-    {
-      "ip": "35.187.231.107",
-      "port": 4002
-    },
     {
       "ip": "35.235.83.83",
       "port": 4002
