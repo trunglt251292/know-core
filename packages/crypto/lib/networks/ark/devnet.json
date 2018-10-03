@@ -8,6 +8,7 @@
   "pubKeyHash": 45,
   "nethash": "360f42a0fedd0865b46fda3f853f2273431c041bbc2eaf4fe8be8c2ab174bf02",
   "wif": 170,
+  "aip20": 1,
   "client": {
     "token": "KNOW",
     "symbol": "KN",

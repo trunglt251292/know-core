@@ -5,6 +5,7 @@ const orderBy = require('lodash/orderBy')
 const database = require('@arkecosystem/core-container').resolvePlugin('database')
 const utils = require('../utils')
 const schema = require('../schema/delegates')
+const { blocks: blocksRepository } = require('../../../repositories')
 
 /**
  * @type {Object}
@@ -87,7 +88,7 @@ exports.blocks = {
       return Boom.notFound('Delegate not found')
     }
 
-    const blocks = await database.blocks.findAllByGenerator(delegate.publicKey, utils.paginate(request))
+    const blocks = await blocksRepository.findAllByGenerator(delegate.publicKey, utils.paginate(request))
 
     return utils.toPagination(request, blocks, 'block')
   },
@@ -143,7 +144,7 @@ exports.voterBalances = {
 
     const voters = {}
     orderBy(wallets, ['balance'], ['desc'])
-      .forEach(wallet => (voters[wallet.address] = wallet.balance))
+      .forEach(wallet => (voters[wallet.address] = wallet.balance.toNumber()))
 
     return { data: voters }
   },

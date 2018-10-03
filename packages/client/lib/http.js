@@ -49,7 +49,7 @@ module.exports = class HttpClient {
    * @return {Promise}
    */
   get (path, params = {}) {
-    return this.sendRequest('get', path, params)
+    return this.sendRequest('get', path, { params })
   }
 
   /**
@@ -89,7 +89,7 @@ module.exports = class HttpClient {
    * @return {Promise}
    */
   delete (path, params = {}) {
-    return this.sendRequest('delete', path, params)
+    return this.sendRequest('delete', path, { params })
   }
 
   /**
@@ -101,9 +101,8 @@ module.exports = class HttpClient {
    * @throws Will throw an error if the HTTP request fails.
    */
   sendRequest (method, path, payload) {
-    if (!this.headers['API-Version']) {
-      this.headers['API-Version'] = this.version
-    }
+    const acceptHeader = `application/vnd.arkCoreApi.v${this.version}`
+    this.headers.Accept = acceptHeader
 
     const client = axios.create({
       baseURL: `${this.host}/api/`,
