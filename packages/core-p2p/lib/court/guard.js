@@ -111,7 +111,7 @@ class Guard {
     if (suspendedPeer && moment().isBefore(suspendedPeer.until)) {
       const untilDiff = moment.duration(suspendedPeer.until.diff(moment.now()))
 
-      logger.debug(`${peer.ip} still suspended for ${Math.ceil(untilDiff.asMinutes())} minutes because of "${suspendedPeer.reason}".`)
+      logger.debug(`${peer.ip} still suspended for ${untilDiff.humanize()} because of "${suspendedPeer.reason}".`)
 
       return true
     } else if (suspendedPeer) {
@@ -196,6 +196,10 @@ class Guard {
 
     // NOTE: We check this extra because a response can still succeed if
     // it returns any codes that are not 4xx or 5xx.
+    if (peer.status === 503) {
+      return this.__determinePunishment(peer, offences.BLOCKCHAIN_NOT_READY)
+    }
+
     if (peer.status !== 200) {
       return this.__determinePunishment(peer, offences.INVALID_STATUS)
     }
@@ -241,7 +245,7 @@ class Guard {
     const until = moment().utc().add(offence.number, offence.period)
     const untilDiff = moment.duration(until.diff(moment.now()))
 
-    logger.debug(`Suspended ${peer.ip} for ${Math.ceil(untilDiff.asMinutes())} minutes because of "${offence.reason}"`)
+    logger.debug(`Suspended ${peer.ip} for ${untilDiff.humanize()} because of "${offence.reason}"`)
 
     return {
       until,

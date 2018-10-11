@@ -116,7 +116,7 @@ module.exports = class TransactionPool extends TransactionPoolInterface {
 
     try {
       const res = await this.pool.hmset(this.__getRedisTransactionKey(transaction.id),
-        'serialized', transaction.serialized.toString('hex'),
+        'serialized', transaction.serialized,
         'senderPublicKey', transaction.senderPublicKey
       )
 
@@ -251,9 +251,7 @@ module.exports = class TransactionPool extends TransactionPoolInterface {
   async removeForgedAndGetPending (transactionIds) {
     const forgedIdsSet = new Set(await database.getForgedTransactionsIds(transactionIds))
 
-    await Promise.all(forgedIdsSet, async (transactionId) => {
-      await this.removeTransactionById(transactionId)
-    })
+    await Promise.all(Array.from(forgedIdsSet).map(id => this.removeTransactionById(id)))
 
     return transactionIds.filter(id => !forgedIdsSet.has(id))
   }
@@ -276,7 +274,7 @@ module.exports = class TransactionPool extends TransactionPoolInterface {
           continue
         }
 
-        transactions.push(transaction.serialized.toString('hex'))
+        transactions.push(transaction.serialized)
         if (transactions.length === blockSize) {
           break
         }
