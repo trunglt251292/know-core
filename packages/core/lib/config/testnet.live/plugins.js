@@ -1,5 +1,4 @@
 module.exports = {
-  '@arkecosystem/core-storage': {},
   '@arkecosystem/core-event-emitter': {},
   '@arkecosystem/core-config': {},
   '@arkecosystem/core-logger': {},
@@ -40,18 +39,14 @@ module.exports = {
     }
   },
   '@arkecosystem/core-transaction-pool': {},
-  '@arkecosystem/core-transaction-pool-redis': {
-    enabled: !process.env.ARK_TRANSACTION_POOL_DISABLED,
-    key: 'ark1',
+  '@arkecosystem/core-transaction-pool-mem': {
+    enabled: true,
+    storage: `${process.env.ARK_PATH_DATA}/database/transaction-pool-${process.env.ARK_NETWORK_NAME}.sqlite`,
     maxTransactionsPerSender: process.env.ARK_TRANSACTION_POOL_MAX_PER_SENDER || 300,
-    whitelist: ['127.0.0.1', '::ffff:127.0.0.1', '192.168.*'],
+    whitelist: [],
     allowedSenders: [],
     maxTransactionsPerRequest: 200,
-    maxTransactionAge: 21600,
-    redis: {
-      host: process.env.ARK_REDIS_HOST || 'localhost',
-      port: process.env.ARK_REDIS_PORT || 6379
-    }
+    maxTransactionAge: 21600
   },
   '@arkecosystem/core-p2p': {
     host: process.env.ARK_P2P_HOST || '0.0.0.0',
