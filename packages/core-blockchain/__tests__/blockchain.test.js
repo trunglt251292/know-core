@@ -44,6 +44,9 @@ afterAll(async () => {
 
   await __resetToHeight1()
 
+  // Manually stop the blockchain
+  await blockchain.stop()
+
   await app.tearDown()
 })
 
@@ -79,7 +82,7 @@ describe('Blockchain', () => {
 
       const started = await blockchain.start(true)
 
-      expect(started).toBeTruthy()
+      expect(started).toBeTrue()
     })
   })
 
@@ -323,7 +326,7 @@ describe('Blockchain', () => {
         expect(blockchain.isSynced({ data: {
           timestamp: slots.getTime(),
           height: genesisBlock.height
-        } })).toBeTruthy()
+        } })).toBeTrue()
       })
     })
 
@@ -333,7 +336,7 @@ describe('Blockchain', () => {
           timestamp: slots.getTime() - genesisBlock.timestamp,
           height: genesisBlock.height
         }))
-        expect(blockchain.isSynced()).toBeTruthy()
+        expect(blockchain.isSynced()).toBeTrue()
         expect(blockchain.getLastBlock()).toHaveBeenCalledWith(true)
       })
     })
@@ -349,7 +352,7 @@ describe('Blockchain', () => {
         expect(blockchain.isRebuildSynced({ data: {
           timestamp: slots.getTime() - 3600 * 24 * 6,
           height: blocks101to155[52].height
-        } })).toBeTruthy()
+        } })).toBeTrue()
       })
     })
 
@@ -359,7 +362,7 @@ describe('Blockchain', () => {
           timestamp: slots.getTime() - genesisBlock.timestamp,
           height: genesisBlock.height
         }))
-        expect(blockchain.isRebuildSynced()).toBeTruthy()
+        expect(blockchain.isRebuildSynced()).toBeTrue()
         expect(blockchain.getLastBlock()).toHaveBeenCalledWith(true)
       })
     })
@@ -400,7 +403,7 @@ describe('Blockchain', () => {
         }
       }
 
-      expect(blockchain.__isChained(previousBlock, nextBlock)).toBeTruthy()
+      expect(blockchain.__isChained(previousBlock, nextBlock)).toBeTrue()
     })
 
     it('should not be ok', () => {
@@ -421,7 +424,7 @@ describe('Blockchain', () => {
         }
       }
 
-      expect(blockchain.__isChained(previousBlock, nextBlock)).toBeFalsy()
+      expect(blockchain.__isChained(previousBlock, nextBlock)).toBeFalse()
     })
   })
 

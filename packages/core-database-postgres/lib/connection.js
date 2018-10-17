@@ -12,10 +12,11 @@ const config = container.resolvePlugin('config')
 const logger = container.resolvePlugin('logger')
 const emitter = container.resolvePlugin('event-emitter')
 
+const { roundCalculator } = require('@arkecosystem/core-utils')
+
 const { Bignum, models: { Block, Transaction } } = require('@arkecosystem/crypto')
 
 const SPV = require('./spv')
-const Cache = require('./cache')
 
 const migrations = require('./migrations')
 const QueryExecutor = require('./sql/query-executor')
@@ -34,12 +35,12 @@ module.exports = class PostgresConnection extends ConnectionInterface {
 
     logger.debug('Connecting to database')
 
-    this.asyncTransaction = null
+    this.queuedQueries = null
+    this.cache = new Map()
 
     try {
       await this.connect()
       await this.__registerQueryExecutor()
-      await this.__registerCache()
       await this.__runMigrations()
       await this.__registerModels()
       await super._registerRepositories()
@@ -70,7 +71,7 @@ module.exports = class PostgresConnection extends ConnectionInterface {
       }
     }
 
-    const pgp = pgPromise({...this.config.initialization, ...initialization})
+    const pgp = pgPromise({ ...this.config.initialization, ...initialization })
 
     this.pgp = pgp
     this.db = this.pgp(this.config.connection)
@@ -82,9 +83,8 @@ module.exports = class PostgresConnection extends ConnectionInterface {
    */
   async disconnect () {
     try {
-      await this.saveBlockCommit()
-      await this.deleteBlockCommit()
-      this.cache.destroy()
+      await this.commitQueuedQueries()
+      this.cache.clear()
     } catch (error) {
       logger.warn('Issue in commiting blocks, database might be corrupted')
       logger.warn(error.message)
@@ -346,49 +346,6 @@ module.exports = class PostgresConnection extends ConnectionInterface {
   }
 
   /**
-   * Stores the block in memory. Generated insert statements are stored in the this.asyncTransaction, to be later saved to the database by calling saveBlockCommit.
-   * NOTE: to use when rebuilding to decrease the number of database tx, and commit blocks (save only every 1000s for instance) using saveBlockCommit
-   * @param  {Block} block
-   * @return {void}
-   */
-  enqueueSaveBlockAsync (block) {
-    if (!this.asyncTransaction) {
-      this.asyncTransaction = []
-    }
-
-    this.asyncTransaction.push(this.db.blocks.create(block.data))
-
-    if (block.transactions.length > 0) {
-      this.asyncTransaction.push(this.db.transactions.create(block.transactions))
-    }
-  }
-
-  /**
-   * Commit the block database transaction.
-   * NOTE: to be used in combination with enqueueSaveBlockAsync
-   * @return {void}
-   */
-  async saveBlockCommit () {
-    if (!this.asyncTransaction) {
-      return
-    }
-
-    logger.debug('Committing database transaction')
-
-    try {
-      await this.db.tx(t => t.batch(this.asyncTransaction))
-
-      this.asyncTransaction = null
-    } catch (error) {
-      logger.error(error)
-
-      this.asyncTransaction = null
-
-      throw error
-    }
-  }
-
-  /**
    * Delete the given block.
    * @param  {Block} block
    * @return {void}
@@ -409,41 +366,81 @@ module.exports = class PostgresConnection extends ConnectionInterface {
   }
 
   /**
-   * Delete the given block (async version).
+   * Stores the block in memory. Generated insert statements are stored in this.queuedQueries, to be later saved to the database by calling commit.
+   * NOTE: to use when rebuilding to decrease the number of database tx, and commit blocks (save only every 1000s for instance) by calling commit.
    * @param  {Block} block
    * @return {void}
    */
-  async deleteBlockAsync (block) {
-    if (!this.asyncTransaction) {
-      this.asyncTransaction = []
+  enqueueSaveBlock (block) {
+    const queries = [this.db.blocks.create(block.data)]
+
+    if (block.transactions.length > 0) {
+      queries.push(this.db.transactions.create(block.transactions))
     }
 
-    await this.db.transactions.deleteByBlock(block.data.id)
-    await this.db.blocks.delete(block.data.id)
+    this.enqueueQueries(queries)
   }
 
   /**
-   * Commit the block database transaction.
-   * NOTE: to be used in combination with deleteBlockAsync
+   * Generated delete statements are stored in this.queuedQueries to be later executed by calling this.commitQueuedQueries.
+   * See also enqueueSaveBlock.
+   * @param  {Block} block
    * @return {void}
    */
-  async deleteBlockCommit () {
-    if (!this.asyncTransaction) {
+  enqueueDeleteBlock (block) {
+    const queries = [
+      this.db.transactions.deleteByBlock(block.data.id),
+      this.db.blocks.delete(block.data.id)
+    ]
+
+    this.enqueueQueries(queries)
+  }
+
+  /**
+   * Generated delete statements are stored in this.queuedQueries to be later executed by calling this.commitQueuedQueries.
+   * @param  {Number} round
+   * @return {void}
+   */
+  enqueueDeleteRound (height) {
+    const { round, nextRound, maxDelegates } = roundCalculator.calculateRound(height)
+
+    if (nextRound === round + 1 && height >= maxDelegates) {
+      this.enqueueQueries([this.db.rounds.delete(nextRound)])
+    }
+  }
+
+  /**
+   * Add queries to the queue to be executed when calling commit.
+   * @param {Array} queries
+   */
+  enqueueQueries (queries) {
+    if (!this.queuedQueries) {
+      this.queuedQueries = []
+    }
+
+    this.queuedQueries.push(...queries)
+  }
+
+  /**
+   * Commit all queued queries.
+   * NOTE: to be used in combination with enqueueSaveBlock and enqueueDeleteBlock.
+   * @return {void}
+   */
+  async commitQueuedQueries () {
+    if (!this.queuedQueries || this.queuedQueries.length === 0) {
       return
     }
 
-    logger.debug('Committing database transaction')
+    logger.debug('Committing database transactions.')
 
     try {
-      await this.db.tx(t => t.batch(this.asyncTransaction))
-
-      this.asyncTransaction = null
+      await this.db.tx(t => t.batch(this.queuedQueries))
     } catch (error) {
       logger.error(error)
 
-      this.asyncTransaction = null
-
       throw error
+    } finally {
+      this.queuedQueries = null
     }
   }
 
@@ -536,27 +533,49 @@ module.exports = class PostgresConnection extends ConnectionInterface {
   async getBlocks (offset, limit) {
     const blocks = await this.db.blocks.heightRange(offset, offset + limit)
 
-    let transactions = []
+    await this.loadTransactionsForBlocks(blocks)
+
+    return blocks
+  }
+
+  /**
+   * Get top count blocks ordered by height DESC.
+   * NOTE: Only used when trying to restore database integrity. The returned blocks may be unchained.
+   * @param  {Number} count
+   * @return {Array}
+   */
+  async getTopBlocks (count) {
+    const blocks = await this.db.blocks.top(count)
+
+    await this.loadTransactionsForBlocks(blocks)
+
+    return blocks
+  }
+
+  /**
+   * Load all transactions for the given blocks
+   * @param  {Array} blocks
+   * @return {void}
+   */
+  async loadTransactionsForBlocks (blocks) {
+    if (!blocks.length) {
+      return
+    }
 
     const ids = blocks.map(block => block.id)
 
-    if (ids.length) {
-      transactions = await this.db.transactions.latestByBlocks(ids)
-
-      transactions = transactions.map(tx => {
-        const data = Transaction.deserialize(tx.serialized.toString('hex'))
-        data.blockId = tx.blockId
-        return data
-      })
-    }
+    let transactions = await this.db.transactions.latestByBlocks(ids)
+    transactions = transactions.map(tx => {
+      const data = Transaction.deserialize(tx.serialized.toString('hex'))
+      data.blockId = tx.blockId
+      return data
+    })
 
     for (const block of blocks) {
       if (block.numberOfTransactions > 0) {
         block.transactions = transactions.filter(transaction => transaction.blockId === block.id)
       }
     }
-
-    return blocks
   }
 
   /**
@@ -643,14 +662,6 @@ module.exports = class PostgresConnection extends ConnectionInterface {
         logger.error(err)
       }
     })
-  }
-
-  /**
-   * Register the cache.
-   * @return {void}
-   */
-  __registerCache () {
-    this.cache = new Cache(this.config.redis)
   }
 
   /**

@@ -8,6 +8,19 @@
 yarn add @arkecosystem/core-blockchain
 ```
 
+## Configuration
+
+```js
+module.exports = {
+  version: '2.0.0',
+  fastRebuild: false,
+  databaseRollback: {
+    maxBlockRewind: 10000,
+    steps: 1000
+  }
+}
+```
+
 ## Security
 
 If you discover a security vulnerability within this package, please send an e-mail to security@ark.io. All security vulnerabilities will be promptly addressed.
