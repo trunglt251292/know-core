@@ -9,6 +9,8 @@ const config = container.resolvePlugin('config')
 const { slots } = require('@arkecosystem/crypto')
 const { Delegate, Transaction } = require('@arkecosystem/crypto').models
 
+const isEmpty = require('lodash/isEmpty')
+
 const Client = require('./client')
 
 module.exports = class ForgerManager {
@@ -29,8 +31,9 @@ module.exports = class ForgerManager {
    * @return {Array}
    */
   async loadDelegates (bip38, password) {
-    if (!bip38 && !this.secrets) {
-      throw new Error('No delegate found')
+    if (!bip38 && (!this.secrets || !this.secrets.length || !Array.isArray(this.secrets))) {
+      logger.warn('No delegate found! Please check your "delegates.json" file and try again.')
+      return
     }
 
     this.delegates = this.secrets.map(passphrase => new Delegate(passphrase, this.network, password))
@@ -141,7 +144,9 @@ module.exports = class ForgerManager {
       // README: The Blockchain is ready but an action still failed.
       logger.error(`Forging failed: ${error.message} :bangbang:`)
 
-      logger.info('Round:', round ? round.current : '', 'Height:', round ? round.lastBlock.height.toLocaleString() : '')
+      if (!isEmpty(round)) {
+        logger.info(`Round: ${round.current.toLocaleString()}, Height: ${round.lastBlock.height.toLocaleString()}`)
+      }
 
       await delay(2000) // no idea when this will be ok, so waiting 2s before checking again
 
@@ -184,7 +189,7 @@ module.exports = class ForgerManager {
   }
 
   /**
-   * Gets the unconfirmed transactions from the relay nodes transactio pool
+   * Gets the unconfirmed transactions from the relay nodes transaction pool
    */
   async __getTransactionsForForging () {
     const response = await this.client.getTransactions()
@@ -193,7 +198,11 @@ module.exports = class ForgerManager {
       ? response.transactions.map(serializedTx => Transaction.fromBytes(serializedTx))
       : []
 
-    logger.debug(`Received ${transactions.length} transactions from the pool containing ${response.poolSize} :money_with_wings:`)
+    if (isEmpty(response)) {
+      logger.error('Could not get unconfirmed transactions from transaction pool.')
+    } else {
+      logger.debug(`Received ${transactions.length} transactions from the pool containing ${response.poolSize} :money_with_wings:`)
+    }
 
     return transactions
   }

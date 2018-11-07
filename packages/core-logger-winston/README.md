@@ -1,6 +1,8 @@
-![ARK Core](https://i.imgur.com/1aP6F2o.png)
+# Ark Core - Winston Logger
 
-# ARK Core - Winston Logger
+<p align="center">
+    <img src="../../banner.png?sanitize=true" />
+</p>
 
 ## Installation
 
@@ -25,7 +27,7 @@ module.exports = {
       constructor: 'DailyRotateFile',
       options: {
         level: process.env.ARK_LOG_LEVEL || 'debug',
-        filename: process.env.ARK_LOG_FILE || `${process.env.ARK_PATH_DATA}/logs/core/${process.env.ARK_NETWORK_NAME}/current.log`,
+        filename: process.env.ARK_LOG_FILE || `${process.env.ARK_PATH_DATA}/logs/core/${process.env.ARK_NETWORK_NAME}/%DATE%.log`,
         datePattern: 'YYYY-MM-DD',
         zippedArchive: true,
         maxSize: '100m',

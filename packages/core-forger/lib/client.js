@@ -15,9 +15,10 @@ module.exports = class Client {
     this.hosts = Array.isArray(hosts) ? hosts : [hosts]
 
     this.headers = {
-      version: container.resolveOptions('blockchain').version,
-      port: container.resolveOptions('p2p').port,
-      nethash: config.network.nethash
+      'version': container.resolveOptions('blockchain').version,
+      'port': container.resolveOptions('p2p').port,
+      'nethash': config.network.nethash,
+      'x-auth': 'forger'
     }
   }
 
@@ -52,11 +53,15 @@ module.exports = class Client {
    * @return {Object}
    */
   async getRound () {
-    await this.__chooseHost()
+    try {
+      await this.__chooseHost()
 
-    const response = await this.__get(`${this.host}/internal/rounds/current`)
+      const response = await this.__get(`${this.host}/internal/rounds/current`)
 
-    return response.data.data
+      return response.data.data
+    } catch (e) {
+      return {}
+    }
   }
 
   /**

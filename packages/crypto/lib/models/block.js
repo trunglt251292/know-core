@@ -160,6 +160,22 @@ module.exports = class Block {
     return temp.toString('hex')
   }
 
+  /**
+   * Get block id from already serialized buffer
+   * @param  {Buffer} serialized block buffer with block-signature included
+   * @return {String}
+   * @static
+   */
+  static getIdFromSerialized (serializedBuffer) {
+    const hash = createHash('sha256').update(serializedBuffer).digest()
+    const temp = Buffer.alloc(8)
+
+    for (let i = 0; i < 8; i++) {
+      temp[i] = hash[7 - i]
+    }
+    return new Bignum(temp.toString('hex'), 16).toFixed()
+  }
+
   static getId (data) {
     const idHex = Block.getIdHex(data)
     return new Bignum(idHex, 16).toFixed()
@@ -327,10 +343,11 @@ module.exports = class Block {
   /**
    * Deserialize block from hex string.
    * @param  {String} hexString
+   * @param  {Boolean} headerOnly - deserialize onlu headers
    * @return {Object}
    * @static
    */
-  static deserialize (hexString) {
+  static deserialize (hexString, headerOnly = false) {
     const block = {}
     const buf = ByteBuffer.fromHex(hexString, true)
     block.version = buf.readUInt32(0)
@@ -349,19 +366,25 @@ module.exports = class Block {
     const length = parseInt('0x' + hexString.substring(104 + 64 + 33 * 2 + 2, 104 + 64 + 33 * 2 + 4), 16) + 2
     block.blockSignature = hexString.substring(104 + 64 + 33 * 2, 104 + 64 + 33 * 2 + length * 2)
 
+    if (headerOnly) return block
+
     let transactionOffset = (104 + 64 + 33 * 2 + length * 2) / 2
     block.transactions = []
     if (hexString.length === transactionOffset * 2) return block
 
-    for (let i = 0; i < block.numberOfTransactions; i++) {
-      block.transactions.push(buf.readUint32(transactionOffset))
-      transactionOffset += 4
-    }
+    // A serialized block stores transactions like this:
+    // |L1|L2|L3|...|LN|  TX1  |    TX2    | TX3 | ... |  TXN  |
+    // Each L is 4 bytes and denotes the length in bytes of the corresponding TX.
+    const lengthOffset = transactionOffset // Position right before L1
+    transactionOffset += block.numberOfTransactions * 4 // Position right after LN
 
     for (let i = 0; i < block.numberOfTransactions; i++) {
-      const transactionsLength = block.transactions[i]
-      block.transactions[i] = Transaction.deserialize(buf.slice(transactionOffset, transactionOffset + transactionsLength).toString('hex'))
-      transactionOffset += transactionsLength
+      const transactionLength = buf.readUint32(lengthOffset + (i * 4))
+
+      const transaction = Transaction.deserialize(buf.slice(transactionOffset, transactionOffset + transactionLength).toString('hex'))
+      block.transactions.push(transaction)
+
+      transactionOffset += transactionLength
     }
 
     return block
@@ -374,15 +397,20 @@ module.exports = class Block {
    * @static
    */
   static serializeFull (block) {
-    const buf = new ByteBuffer(1024, true)
-    buf.append(Block.serialize(block, true))
+    const serializedBlock = Block.serialize(block, true);
+    const transactions = block.transactions
 
-    const serializedTransactions = block.transactions.map(transaction => Transaction.serialize(transaction))
-    serializedTransactions.forEach(transaction => buf.writeUInt32(transaction.length))
-    serializedTransactions.forEach(transaction => buf.append(transaction))
-    buf.flip()
+    const buf = new ByteBuffer(serializedBlock.length + transactions.length * 4, true)
+      .append(serializedBlock)
+      .skip(transactions.length * 4)
 
-    return buf.toBuffer()
+    for (let i = 0; i < transactions.length; i++) {
+      const serialized = Transaction.serialize(transactions[i])
+      buf.writeUint32(serialized.length, serializedBlock.length + (i * 4))
+      buf.append(serialized)
+    }
+
+    return buf.flip().toBuffer()
   }
 
   /**

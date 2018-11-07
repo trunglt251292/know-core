@@ -1,6 +1,6 @@
 {
   "name": "@arkecosystem/core",
-  "description": "Core of the ARK Blockchain",
+  "description": "Core of the Ark Blockchain",
   "version": "0.1.1",
   "contributors": [
     "François-Xavier Thoorens <fx@ark.io>",
@@ -61,13 +61,16 @@
     "@arkecosystem/core-p2p": "^0.1.1",
     "@arkecosystem/core-transaction-pool-mem": "^0.1.1",
     "@arkecosystem/core-webhooks": "^0.1.1",
-    "@arkecosystem/crypto": "^0.2.0",
+    "@arkecosystem/crypto": "^0.2.3",
     "bip38": "^2.0.2",
-    "commander": "^2.15.1",
+    "commander": "^2.19.0",
     "fs": "^0.0.1-security",
     "wif": "^2.0.6"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "engines": {
+    "node" : ">=10.x"
   }
 }

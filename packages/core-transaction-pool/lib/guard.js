@@ -1,4 +1,3 @@
-const Promise = require('bluebird')
 const container = require('@arkecosystem/core-container')
 const crypto = require('@arkecosystem/crypto')
 const { configManager, models: { Transaction }, constants: { TRANSACTION_TYPES } } = crypto
@@ -25,13 +24,13 @@ module.exports = class TransactionGuard {
    * @return {void}
    */
   async validate (transactions) {
-    await this.__transformAndFilterTransations(_.uniqBy(transactions, 'id'))
+    this.__transformAndFilterTransactions(_.uniqBy(transactions, 'id'))
 
     await this.__removeForgedTransactions()
 
-    await this.__determineValidTransactions()
+    this.__determineValidTransactions()
 
-    await this.__determineExcessTransactions()
+    this.__determineExcessTransactions()
   }
 
   /**
@@ -121,17 +120,19 @@ module.exports = class TransactionGuard {
    * @param  {Array} transactions
    * @return {void}
    */
-  async __transformAndFilterTransations (transactions) {
+  __transformAndFilterTransactions (transactions) {
     this.transactions = []
 
-    await Promise.each(transactions, async (transaction) => {
-      const exists = await this.pool.transactionExists(transaction.id)
+    transactions.forEach(transaction => {
+      const exists = this.pool.transactionExists(transaction.id)
 
       if (!exists && !this.pool.isSenderBlocked(transaction.senderPublicKey)) {
         const trx = new Transaction(transaction)
 
         if (trx.verified) {
           this.transactions.push(trx)
+        } else {
+          this.__pushError(transaction, 'Transaction didn\'t pass the verification process.')
         }
       }
     })
@@ -159,19 +160,43 @@ module.exports = class TransactionGuard {
    * Determines valid transactions by checking rules, according to:
    * - if recipient is on the same network
    * - if sender has enough funds
+   * - if sender already has another transaction of the same type, for types that
+   *   only allow one transaction at a time in the pool (e.g. vote)
    * Transaction that can be broadcasted are confirmed here
    */
-  async __determineValidTransactions () {
-    await Promise.each(this.transactions, async (transaction) => {
-      if (transaction.type === TRANSACTION_TYPES.TRANSFER) {
+  __determineValidTransactions () {
+    this.transactions.forEach(transaction => {
+      switch (transaction.type) {
+      case TRANSACTION_TYPES.TRANSFER:
         if (!isRecipientOnActiveNetwork(transaction)) {
           this.__pushError(transaction, `Recipient ${transaction.recipientId} is not on the same network: ${configManager.get('pubKeyHash')}`)
           return
         }
+        break
+      case TRANSACTION_TYPES.SECOND_SIGNATURE:
+      case TRANSACTION_TYPES.DELEGATE_REGISTRATION:
+      case TRANSACTION_TYPES.VOTE:
+        if (this.pool.senderHasTransactionsOfType(transaction.senderPublicKey, transaction.type)) {
+          this.__pushError(transaction,
+            `Sender ${transaction.senderPublicKey} already has a transaction of type ` +
+            `'${TRANSACTION_TYPES.toString(transaction.type)}' in the pool`)
+          return
+        }
+        break
+      case TRANSACTION_TYPES.MULTI_SIGNATURE:
+      case TRANSACTION_TYPES.IPFS:
+      case TRANSACTION_TYPES.TIMELOCK_TRANSFER:
+      case TRANSACTION_TYPES.MULTI_PAYMENT:
+      case TRANSACTION_TYPES.DELEGATE_RESIGNATION:
+      default:
+        this.__pushError(transaction,
+          'Invalidating transaction of unsupported type ' +
+          `'${TRANSACTION_TYPES.toString(transaction.type)}'`)
+        return
       }
 
       try {
-        await this.pool.walletManager.applyPoolTransaction(transaction)
+        this.pool.walletManager.applyPoolTransaction(transaction)
       } catch (error) {
         this.__pushError(transaction, error.toString())
         return
@@ -184,19 +209,19 @@ module.exports = class TransactionGuard {
   /**
    * Determine exccess transactions
    */
-  async __determineExcessTransactions () {
+  __determineExcessTransactions () {
     for (let transaction of this.broadcast) {
-      const hasExceeded = await this.pool.hasExceededMaxTransactions(transaction)
+      const hasExceeded = this.pool.hasExceededMaxTransactions(transaction)
 
       if (hasExceeded) {
         this.excess.push(transaction)
       } else {
         /**
-         * We need to check this again after checking it in "__transformAndFilterTransations"
+         * We need to check this again after checking it in "__transformAndFilterTransactions"
          * because the state of the transaction pool could have changed since then
          * if concurrent requests are occurring via API.
          */
-        const exists = await this.pool.transactionExists(transaction.id)
+        const exists = this.pool.transactionExists(transaction.id)
 
         if (exists) {
           this.__pushError(transaction, 'Already exists in pool.')
